@@ -4,7 +4,7 @@ import json
 
 app = Flask(__name__)
 
-# Telegram Bot Config
+# Telegram config
 BOT_TOKEN = "8214186320:AAGpMuO7aMRjuozhMYHa3rxW9vW7NtG7g5w"
 CHAT_ID   = "-1003103152784"
 
@@ -16,40 +16,20 @@ def send_telegram_message(message: str):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        # --- STEP 1: Detect payload type ---
-        data = None
+        # --- STEP 1: Get raw message from TradingView alert ---
+        raw_msg = request.form.get('message') or request.data.decode('utf-8')
+        if not raw_msg:
+            return "No message received", 400
 
-        # Case 1: JSON payload
-        if request.is_json:
-            data = request.get_json()
+        # --- STEP 2: Parse JSON string from Pine Script ---
+        try:
+            data = json.loads(raw_msg)
+        except json.JSONDecodeError:
+            # If not valid JSON, send raw message
+            send_telegram_message(raw_msg)
+            return "OK (sent raw message)", 200
 
-        # Case 2: Form-data from TradingView default POST
-        elif request.form:
-            # TradingView sends 'payload' field for JSON
-            payload_str = request.form.get('payload')
-            if payload_str:
-                data = json.loads(payload_str)
-            else:
-                # fallback: take first key-value as JSON
-                for key in request.form:
-                    try:
-                        data = json.loads(key)
-                        break
-                    except:
-                        continue
-
-        # Case 3: Raw body
-        else:
-            try:
-                body = request.data.decode('utf-8')
-                data = json.loads(body)
-            except:
-                pass
-
-        if not data:
-            return "Unsupported Media Type / Invalid payload", 415
-
-        # --- STEP 2: Extract fields ---
+        # --- STEP 3: Extract fields ---
         action     = data.get("action", "")
         symbol     = data.get("symbol", "")
         order_type = data.get("type", "")
@@ -61,18 +41,23 @@ def webhook():
         pnl        = data.get("pnl", "")
         reason     = data.get("reason", "")
 
-        # --- STEP 3: Build Telegram message ---
-        msg = f"*📊 TradingView Alert*\n"
-        msg += f"Action      : *{action}*\n"
-        msg += f"Symbol      : `{symbol}`\n"
-        msg += f"Type        : `{order_type}`\n"
-        if entry: msg += f"Entry Price : `{entry}`\n"
-        if stop_loss: msg += f"Stop Loss   : `{stop_loss}`\n"
-        if exit_price: msg += f"Exit Price  : `{exit_price}`\n"
-        if pnl: msg += f"PnL         : `{pnl}`\n"
-        if leverage: msg += f"Leverage    : `{leverage}`\n"
-        if amount: msg += f"Amount      : `{amount}`\n"
-        if reason: msg += f"Reason      : `{reason}`"
+        # --- STEP 4: Add emojis for quick recognition ---
+        emoji_action = "📈" if action.upper() == "BUY" else "📉" if action.upper() == "SELL" else "⚡"
+
+        # --- STEP 5: Build pretty Telegram message ---
+        msg = f"*{emoji_action} TradingView Alert*\n"
+        msg += f"*Action      :* {action}\n"
+        msg += f"*Symbol      :* `{symbol}`\n"
+        msg += f"*Type        :* `{order_type}`\n"
+        if entry: msg += f"*Entry Price :* `{entry}`\n"
+        if stop_loss: msg += f"*Stop Loss   :* `{stop_loss}`\n"
+        if exit_price: msg += f"*Exit Price  :* `{exit_price}`\n"
+        if pnl:
+            # Color-code PnL using + / - signs
+            msg += f"*PnL         :* {'🟢' if '+' in str(pnl) else '🔴'} `{pnl}`\n"
+        if leverage: msg += f"*Leverage    :* `{leverage}`\n"
+        if amount: msg += f"*Amount      :* `{amount}`\n"
+        if reason: msg += f"*Reason      :* `{reason}`"
 
         send_telegram_message(msg)
         return "OK", 200
