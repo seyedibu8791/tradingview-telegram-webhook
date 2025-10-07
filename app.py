@@ -31,7 +31,7 @@ def send_cornix_message(symbol, action, price, stop_loss=None, entry_price=None)
             f"**Symbol:** {ticker}\n"
             f"**Exchange:** Binance Futures\n"
             f"**Leverage:** Isolated (10X)\n"
-            f"**Trade Amount:** 2%"
+            f"**Trade Amount:** 2%\n"
             f"**Type:** MARKET\n"
             f"**Entry Price:** {price}\n"
             f"**Stop Loss:** {stop_loss}\n"
@@ -54,7 +54,7 @@ def send_cornix_message(symbol, action, price, stop_loss=None, entry_price=None)
                 pnl_text = f"🔻 Loss: -{abs(pnl_percent)}%"
 
             report = (
-                f"{ticker} Report\n"
+                f"{ticker} EXIT Report\n"
                 f"Exit Price: {price}\n"
                 f"{pnl_text}"
             )
