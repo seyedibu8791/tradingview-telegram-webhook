@@ -27,14 +27,14 @@ def send_cornix_message(symbol, action, price, stop_loss=None, entry_price=None)
     if action in ["BUY", "SELL"]:
         # Entry message with bold labels
         text = (
-            f"**Exchange:** Binance Futures\n"
             f"**Action:** {action}\n"
             f"**Symbol:** {ticker}\n"
+            f"**Exchange:** Binance Futures\n"
+            f"**Leverage:** Isolated (10X)\n"
+            f"**Trade Amount:** 2%"
             f"**Type:** MARKET\n"
             f"**Entry Price:** {price}\n"
             f"**Stop Loss:** {stop_loss}\n"
-            f"**Leverage:** Isolated (10X)\n"
-            f"**Trade Amount:** 2%"
         )
         messages.append(text)
 
