@@ -4,35 +4,52 @@ import json
 
 app = Flask(__name__)
 
-# =============================
-# Telegram Config
+# Telegram Bot Config
 BOT_TOKEN = "8214186320:AAGpMuO7aMRjuozhMYHa3rxW9vW7NtG7g5w"
-CHAT_ID   = "-1003103152784"  # your channel/chat ID
+CHAT_ID   = "-1003103152784"
 
 def send_telegram_message(message: str):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
+    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     requests.post(url, json=payload)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        # Try parsing JSON first
-        data = request.get_json(silent=True)
-        
-        # If JSON is None, try form data (TradingView default)
-        if data is None:
-            data_str = request.form.get('payload') or request.data.decode('utf-8')
-            try:
-                data = json.loads(data_str)
-            except:
-                return "Invalid payload", 400
+        # --- STEP 1: Detect payload type ---
+        data = None
 
-        # Extract fields from TradingView JSON
+        # Case 1: JSON payload
+        if request.is_json:
+            data = request.get_json()
+
+        # Case 2: Form-data from TradingView default POST
+        elif request.form:
+            # TradingView sends 'payload' field for JSON
+            payload_str = request.form.get('payload')
+            if payload_str:
+                data = json.loads(payload_str)
+            else:
+                # fallback: take first key-value as JSON
+                for key in request.form:
+                    try:
+                        data = json.loads(key)
+                        break
+                    except:
+                        continue
+
+        # Case 3: Raw body
+        else:
+            try:
+                body = request.data.decode('utf-8')
+                data = json.loads(body)
+            except:
+                pass
+
+        if not data:
+            return "Unsupported Media Type / Invalid payload", 415
+
+        # --- STEP 2: Extract fields ---
         action     = data.get("action", "")
         symbol     = data.get("symbol", "")
         order_type = data.get("type", "")
@@ -44,7 +61,7 @@ def webhook():
         pnl        = data.get("pnl", "")
         reason     = data.get("reason", "")
 
-        # Build Telegram message in table-like format
+        # --- STEP 3: Build Telegram message ---
         msg = f"*📊 TradingView Alert*\n"
         msg += f"Action      : *{action}*\n"
         msg += f"Symbol      : `{symbol}`\n"
@@ -66,5 +83,5 @@ def webhook():
 
 if __name__ == "__main__":
     import os
-    port = int(os.environ.get("PORT", 5000))  # Render assigns the port
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
