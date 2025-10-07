@@ -16,16 +16,16 @@ def send_telegram_message(message: str):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        # --- STEP 1: Get raw message from TradingView alert ---
-        raw_msg = request.form.get('message') or request.data.decode('utf-8')
+        # --- STEP 1: Read raw body from TradingView ---
+        raw_msg = request.data.decode('utf-8')
         if not raw_msg:
             return "No message received", 400
 
-        # --- STEP 2: Parse JSON string from Pine Script ---
+        # --- STEP 2: Try parse JSON from Pine Script ---
         try:
             data = json.loads(raw_msg)
         except json.JSONDecodeError:
-            # If not valid JSON, send raw message
+            # fallback: send raw message
             send_telegram_message(raw_msg)
             return "OK (sent raw message)", 200
 
@@ -41,10 +41,10 @@ def webhook():
         pnl        = data.get("pnl", "")
         reason     = data.get("reason", "")
 
-        # --- STEP 4: Add emojis for quick recognition ---
+        # --- STEP 4: Add emoji for quick recognition ---
         emoji_action = "📈" if action.upper() == "BUY" else "📉" if action.upper() == "SELL" else "⚡"
 
-        # --- STEP 5: Build pretty Telegram message ---
+        # --- STEP 5: Build Telegram message ---
         msg = f"*{emoji_action} TradingView Alert*\n"
         msg += f"*Action      :* {action}\n"
         msg += f"*Symbol      :* `{symbol}`\n"
@@ -53,7 +53,6 @@ def webhook():
         if stop_loss: msg += f"*Stop Loss   :* `{stop_loss}`\n"
         if exit_price: msg += f"*Exit Price  :* `{exit_price}`\n"
         if pnl:
-            # Color-code PnL using + / - signs
             msg += f"*PnL         :* {'🟢' if '+' in str(pnl) else '🔴'} `{pnl}`\n"
         if leverage: msg += f"*Leverage    :* `{leverage}`\n"
         if amount: msg += f"*Amount      :* `{amount}`\n"
