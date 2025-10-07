@@ -1,18 +1,17 @@
 from flask import Flask, request, jsonify
-import requests
-import os
+import requests, os
 
 app = Flask(__name__)
 
 BOT_TOKEN = "8214186320:AAGpMuO7aMRjuozhMYHa3rxW9vW7NtG7g5w"
 CHAT_ID   = "-1003103152784"
 
+# Keep track of entries for PnL calculation
 symbol_data = {}
 
 def send_telegram_json(symbol, action, price, stop_loss=None, pnl=None):
-    # Construct JSON payload for bots
     payload = {
-        "action": action,         # BUY, SELL, CLOSE
+        "action": action,
         "symbol": symbol,
         "type": "MARKET",
         "entry_price": price,
@@ -21,7 +20,6 @@ def send_telegram_json(symbol, action, price, stop_loss=None, pnl=None):
         "leverage": "10X",
         "trade_amount": "2%"
     }
-    # Send as text JSON to Telegram (or bot)
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     requests.post(url, json={"chat_id": CHAT_ID, "text": str(payload)})
 
@@ -31,9 +29,8 @@ def webhook():
     if not raw_msg:
         return jsonify({"status":"no message"}), 200
 
-    # Parse symbol, price, comment
     try:
-        symbol, price_str, comment = raw_msg.split()
+        symbol, comment, price_str = raw_msg.split("|")
         price = float(price_str)
     except:
         return jsonify({"status":"invalid format"}), 200
@@ -51,6 +48,7 @@ def webhook():
     if not action:
         return jsonify({"status":"unknown comment"}), 200
 
+    # Compute stop-loss and PnL
     if action in ["BUY","SELL"]:
         stop_loss = price * 0.98 if action=="BUY" else price * 1.02
         symbol_data[symbol] = {"entry": price, "stop_loss": stop_loss}
@@ -62,7 +60,7 @@ def webhook():
         if symbol in symbol_data:
             del symbol_data[symbol]
         send_telegram_json(symbol, action, price, pnl=pnl)
-    
+
     return jsonify({"status":"ok"}), 200
 
 if __name__ == "__main__":
