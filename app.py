@@ -56,7 +56,7 @@ def send_cornix_message(symbol, action, price, stop_loss=None, timeframe="Unknow
             f"*Entry Price:* {price}\n"
             f"*Stop Loss:* {stop_loss}\n"
             f"--- ⌁ ---\n"
-            f"⚠️ Enter at Market Price,\nWait for close signal"
+            f"⚠️ Wait for close signal"
         )
         send_telegram_message(msg)
 
@@ -84,8 +84,11 @@ def webhook():
     timeframe_raw = parts[3] if len(parts) > 3 else "Unknown"
     timeframe = format_timeframe(timeframe_raw)
 
-    # BLOCK 1-MIN TIMEFRAME SIGNALS
-    if timeframe.strip().lower() in ["1 min", "1 mins", "1 minute", "1 minutes"]:
+    # Normalize timeframe for checking
+    timeframe_clean = timeframe.strip().lower()
+
+    # BLOCK *ALL* 1-MIN TIMEFRAME SIGNALS (ENTRY + EXIT)
+    if timeframe_clean in ["1 min", "1 mins", "1 minute", "1 minutes"]:
         print(f"[BLOCKED] {symbol} | {comment} | {price} | {timeframe}")
         return jsonify({"status": "blocked"}), 200
 
