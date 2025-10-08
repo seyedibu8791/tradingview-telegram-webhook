@@ -8,7 +8,7 @@ app = Flask(__name__)
 # =========================
 BOT_TOKEN = "8214186320:AAGpMuO7aMRjuozhMYHa3rxW9vW7NtG7g5w"
 CHAT_ID   = "-1003103152784"
-LEVERAGE  = 10  # leverage multiplier for PnL
+LEVERAGE  = 20  # leverage multiplier for PnL
 
 # Store entry details
 symbol_data = {}
