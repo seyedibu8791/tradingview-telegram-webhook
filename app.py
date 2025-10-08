@@ -94,8 +94,8 @@ def webhook():
 
     # Map comments to actions
     action_map = {
-        "BUY_ENTRY": "BUY",
-        "SELL_ENTRY": "SELL",
+        "BUY_ENTRY": "BUY 💹",
+        "SELL_ENTRY": "SELL 🛑",
         "EXIT_LONG": "CLOSE",
         "EXIT_SHORT": "CLOSE",
         "CROSS_EXIT_LONG": "CLOSE",
