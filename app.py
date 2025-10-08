@@ -37,48 +37,32 @@ def format_timeframe(tf_raw):
 # =========================
 # MAIN MESSAGE BUILDER
 # =========================
-def send_cornix_message(symbol, action, price, stop_loss=None, entry_price=None, entry_action=None, timeframe="Unknown"):
+def send_cornix_message(symbol, action, price, stop_loss=None, timeframe="Unknown"):
     ticker = f"#{symbol}"
     price = round(price, 6)
     if stop_loss:
         stop_loss = round(stop_loss, 6)
 
-    # ENTRY SECTION
+    # ENTRY MESSAGE
     if action in ["BUY", "SELL"]:
         msg = (
-            f"*Exchange:* Binance Futures\n"
             f"*Action:* {action}\n"
             f"*Symbol:* {ticker}\n"
-            f"*Type:* MARKET\n"
+            f"--- ⌁ ---\n"
+            f"*Exchange:* Binance Futures\n"
+            f"*Timeframe:* {timeframe}\n"
+            f"*Leverage:* Isolated ({LEVERAGE}X)\n"
+            f"--- ⌁ ---\n"
             f"*Entry Price:* {price}\n"
             f"*Stop Loss:* {stop_loss}\n"
-            f"*Leverage:* Isolated ({LEVERAGE}X)\n"
-            f"*Timeframe:* {timeframe}"
+            f"--- ⌁ ---\n"
+            f"⚠️ Enter at Market Price,\nWait for close signal"
         )
         send_telegram_message(msg)
 
-    # EXIT SECTION
+    # EXIT MESSAGE
     elif action == "CLOSE":
         send_telegram_message(f"Close {ticker}")
-
-        # Calculate PnL correctly based on entry type
-        if entry_price and entry_action:
-            if entry_action == "BUY":
-                pnl_percent = ((price - entry_price) / entry_price) * 100
-            elif entry_action == "SELL":
-                pnl_percent = ((entry_price - price) / entry_price) * 100
-            else:
-                pnl_percent = 0
-
-            pnl_percent = round(pnl_percent * LEVERAGE, 2)
-            pnl_text = f"{abs(pnl_percent)}% Profit" if pnl_percent > 0 else f"{abs(pnl_percent)}% Loss"
-
-            pnl_report = (
-                f"*{ticker} Report*\n"
-                f"Exit Price: {round(price, 6)}\n"
-                f"PnL: {pnl_text}"
-            )
-            send_telegram_message(pnl_report)
 
 # =========================
 # WEBHOOK
@@ -99,6 +83,11 @@ def webhook():
     price = float(parts[2])
     timeframe_raw = parts[3] if len(parts) > 3 else "Unknown"
     timeframe = format_timeframe(timeframe_raw)
+
+    # BLOCK 1-MIN TIMEFRAME SIGNALS
+    if timeframe.strip().lower() in ["1 min", "1 mins", "1 minute", "1 minutes"]:
+        print(f"[BLOCKED] {symbol} | {comment} | {price} | {timeframe}")
+        return jsonify({"status": "blocked"}), 200
 
     # Map comments to actions
     action_map = {
@@ -121,13 +110,11 @@ def webhook():
 
     # Process Exit
     elif action == "CLOSE":
-        entry_info = symbol_data.get(symbol, {})
-        entry_price = entry_info.get("entry")
-        entry_action = entry_info.get("action")
         if symbol in symbol_data:
             del symbol_data[symbol]
-        send_cornix_message(symbol, "CLOSE", price, entry_price=entry_price, entry_action=entry_action, timeframe=timeframe)
+        send_cornix_message(symbol, "CLOSE", price, timeframe=timeframe)
 
+    print(f"[FORWARDED] {symbol} | {comment} | {price} | {timeframe}")
     return jsonify({"status": "ok"}), 200
 
 # =========================
