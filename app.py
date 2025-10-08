@@ -8,15 +8,13 @@ app = Flask(__name__)
 # =========================
 BOT_TOKEN = "8214186320:AAGpMuO7aMRjuozhMYHa3rxW9vW7NtG7g5w"
 CHAT_ID   = "-1003103152784"
-LEVERAGE  = 10  # 10x leverage
 
-# Keep track of entry prices for PnL calculation
 symbol_data = {}
 
 # =========================
 # FUNCTION TO FORMAT MESSAGES
 # =========================
-def send_cornix_message(symbol, action, price, stop_loss=None, entry_price=None):
+def send_cornix_message(symbol, action, price, stop_loss=None, entry_price=None, timeframe=None):
     ticker = f"#{symbol}"
     price = round(price, 6)
     if stop_loss:
@@ -25,42 +23,35 @@ def send_cornix_message(symbol, action, price, stop_loss=None, entry_price=None)
     messages = []
 
     if action in ["BUY", "SELL"]:
-        # Entry message with bold labels
-        text = (
-            f"**Action:** {action}\n"
-            f"**Symbol:** {ticker}\n"
-            f"**Exchange:** Binance Futures\n"
-            f"**Leverage:** Isolated (10X)\n"
-            f"**Trade Amount:** 2%\n"
-            f"**Type:** MARKET\n"
-            f"**Entry Price:** {price}\n"
-            f"**Stop Loss:** {stop_loss}\n"
+        entry_msg = (
+            f"📊 Exchange: Binance Futures\n"
+            f"Action: {action}\n"
+            f"Symbol: {ticker}\n"
+            f"Type: MARKET\n"
+            f"Entry Price: {price}\n"
+            f"Stop Loss: {stop_loss}\n"
+            f"Leverage: Isolated (10X)\n"
+            f"Timeframe: {timeframe}"
         )
-        messages.append(text)
+        messages.append(entry_msg)
 
     elif action == "CLOSE":
-        # 1️⃣ Close command message
-        close_text = f"Close {ticker}"
-        messages.append(close_text)
+        # Message 1: Close Command
+        messages.append(f"Close {ticker}")
 
-        # 2️⃣ PnL report message
+        # Message 2: Exit Report
         if entry_price:
             pnl_percent = round((price - entry_price) / entry_price * 100, 2)
-            pnl_percent *= LEVERAGE  # multiply by leverage
-
-            if pnl_percent >= 0:
-                pnl_text = f"💰 Profit: +{abs(pnl_percent)}%"
-            else:
-                pnl_text = f"🔻 Loss: -{abs(pnl_percent)}%"
-
-            report = (
-                f"{ticker} EXIT Report\n"
+            pnl_percent *= 10  # leverage effect (10X)
+            pnl_text = f"{abs(pnl_percent)}% Profit" if pnl_percent >= 0 else f"{abs(pnl_percent)}% Loss"
+            exit_msg = (
+                f"{ticker} Report\n"
                 f"Exit Price: {price}\n"
-                f"{pnl_text}"
+                f"Pnl: {pnl_text}"
             )
-            messages.append(report)
+            messages.append(exit_msg)
         else:
-            messages.append(f"{ticker} Report\nExit Price: {price}\nPnL: N/A")
+            messages.append(f"{ticker} Report\nExit Price: {price}")
 
     return messages
 
@@ -74,8 +65,11 @@ def webhook():
     if not raw_msg:
         return jsonify({"status": "no message"}), 200
 
+    # Expected format: "TICKER|COMMENT|PRICE|TIMEFRAME"
     try:
-        symbol, comment, price_str = raw_msg.split("|")
+        parts = raw_msg.split("|")
+        symbol, comment, price_str = parts[:3]
+        timeframe = parts[3] if len(parts) > 3 else "Unknown"
         price = float(price_str)
     except Exception as e:
         return jsonify({"status": "invalid format", "error": str(e)}), 200
@@ -96,7 +90,7 @@ def webhook():
     if action in ["BUY", "SELL"]:
         stop_loss = price * 0.98 if action == "BUY" else price * 1.02
         symbol_data[symbol] = {"entry": price, "stop_loss": stop_loss}
-        messages = send_cornix_message(symbol, action, price, stop_loss=stop_loss)
+        messages = send_cornix_message(symbol, action, price, stop_loss=stop_loss, timeframe=timeframe)
 
     elif action == "CLOSE":
         entry_price = symbol_data.get(symbol, {}).get("entry")
@@ -104,19 +98,15 @@ def webhook():
             del symbol_data[symbol]
         messages = send_cornix_message(symbol, "CLOSE", price, entry_price=entry_price)
 
-    # Send formatted messages to Telegram (enable markdown)
     for msg in messages:
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"}
+            json={"chat_id": CHAT_ID, "text": msg}
         )
 
     return jsonify({"status": "ok"}), 200
 
 
-# =========================
-# RUN APP
-# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
