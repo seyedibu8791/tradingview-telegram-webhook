@@ -44,7 +44,7 @@ def send_cornix_message(symbol, action, price, stop_loss=None, timeframe="Unknow
         stop_loss = round(stop_loss, 6)
 
     # ENTRY MESSAGE
-    if action in ["BUY", "SELL"]:
+    if action in ["BUY 💹", "SELL 🛑"]:
         msg = (
             f"*Action:* {action}\n"
             f"*Symbol:* {ticker}\n"
@@ -53,10 +53,10 @@ def send_cornix_message(symbol, action, price, stop_loss=None, timeframe="Unknow
             f"*Timeframe:* {timeframe}\n"
             f"*Leverage:* Isolated ({LEVERAGE}X)\n"
             f"--- ⌁ ---\n"
-            f"*Entry Price:* {price}\n"
-            f"*Stop Loss:* {stop_loss}\n"
+            f"*☑️ Entry Price:* {price}\n"
+            f"*☑️ Stop Loss:* {stop_loss}\n"
             f"--- ⌁ ---\n"
-            f"⚠️ Wait for close signal"
+            f"⚠️ Wait for Close Signal!\n"
         )
         send_telegram_message(msg)
 
