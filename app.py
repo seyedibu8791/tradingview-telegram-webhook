@@ -107,7 +107,7 @@ def webhook():
 
     # Process Entry
     if action in ["BUY 💹", "SELL 🛑"]:
-        stop_loss = price * 0.97 if action == "BUY 💹" else price * 1.03
+        stop_loss = price * 0.98 if action == "BUY 💹" else price * 1.02
         symbol_data[symbol] = {"entry": price, "action": action, "stop_loss": stop_loss}
         send_cornix_message(symbol, action, price, stop_loss=stop_loss, timeframe=timeframe)
 
