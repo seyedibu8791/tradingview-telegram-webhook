@@ -64,7 +64,7 @@ def send_cornix_message(symbol, action, price, stop_loss=None, timeframe="Unknow
 
     # EXIT MESSAGE
     elif action == "CLOSE":
-        send_telegram_message(f"Close {ticker}")
+        send_telegram_message(f"/Close {ticker}")
 
 # =========================
 # WEBHOOK
