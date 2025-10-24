@@ -1,14 +1,16 @@
 from flask import Flask, request, jsonify
-import requests, os
+import requests, os, threading, time
 
 app = Flask(__name__)
 
 # =========================
-# CONFIG
+# CONFIG FROM ENVIRONMENT
 # =========================
-BOT_TOKEN = "8214186320:AAGpMuO7aMRjuozhMYHa3rxW9vW7NtG7g5w"
-CHAT_ID   = "-1003103152784"
-LEVERAGE  = 20  # leverage multiplier for PnL
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHAT_ID   = os.environ.get("CHAT_ID")
+LEVERAGE  = int(os.environ.get("LEVERAGE", 20))  # default 20x
+SELF_URL  = os.environ.get("SELF_URL")  # optional: URL for self-ping
+PORT      = int(os.environ.get("PORT", 5000))
 
 # Store entry details
 symbol_data = {}
@@ -35,7 +37,7 @@ def format_timeframe(tf_raw):
     return tf_raw if tf_raw else "Unknown"
 
 # =========================
-# MAIN MESSAGE BUILDER
+# MESSAGE BUILDER
 # =========================
 def send_cornix_message(symbol, action, price, stop_loss=None, timeframe="Unknown"):
     ticker = f"#{symbol}"
@@ -78,17 +80,14 @@ def webhook():
     if len(parts) < 3:
         return jsonify({"status": "invalid format"}), 200
 
-    symbol = parts[0]
+    symbol = parts[0].replace("/", "")  # remove "/" to normalize
     comment = parts[1]
     price = float(parts[2])
     timeframe_raw = parts[3] if len(parts) > 3 else "Unknown"
     timeframe = format_timeframe(timeframe_raw)
 
-    # Normalize timeframe for checking
-    timeframe_clean = timeframe.strip().lower()
-
-    # BLOCK *ALL* 1-MIN TIMEFRAME SIGNALS (ENTRY + EXIT)
-    if timeframe_clean in ["1 min", "1 mins", "1 minute", "1 minutes"]:
+    # BLOCK *ALL* 1-MIN TIMEFRAME SIGNALS
+    if timeframe.strip().lower() in ["1 min", "1 mins", "1 minute", "1 minutes"]:
         print(f"[BLOCKED] {symbol} | {comment} | {price} | {timeframe}")
         return jsonify({"status": "blocked"}), 200
 
@@ -99,9 +98,10 @@ def webhook():
         "EXIT_LONG": "CLOSE",
         "EXIT_SHORT": "CLOSE",
         "CROSS_EXIT_LONG": "CLOSE",
-        "CROSS_EXIT_SHORT": "CLOSE"
+        "CROSS_EXIT_SHORT": "CLOSE",
+        "MANUALLY_CANCELLED": "CLOSE"
     }
-    action = action_map.get(comment)
+    action = action_map.get(comment.upper())
     if not action:
         return jsonify({"status": "unknown comment"}), 200
 
@@ -121,8 +121,30 @@ def webhook():
     return jsonify({"status": "ok"}), 200
 
 # =========================
+# KEEP-ALIVE THREAD
+# =========================
+def keep_alive():
+    while True:
+        if SELF_URL:
+            try:
+                requests.get(f"{SELF_URL}/ping")
+                print(f"[KEEP-ALIVE] Pinged {SELF_URL}")
+            except Exception as e:
+                print(f"[KEEP-ALIVE ERROR] {e}")
+        time.sleep(180)  # every 3 minutes
+
+threading.Thread(target=keep_alive, daemon=True).start()
+
+# =========================
+# PING ENDPOINT
+# =========================
+@app.route("/ping", methods=["GET"])
+def ping():
+    return jsonify({"status": "alive"}), 200
+
+# =========================
 # RUN SERVER
 # =========================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    print(f"Starting Flask TradingView → Telegram Bot on port {PORT}")
+    app.run(host="0.0.0.0", port=PORT)
